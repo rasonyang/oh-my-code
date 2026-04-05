@@ -1,1 +1,17 @@
+# Rust build output
 /target
+
+# rustfmt backup files
+**/*.rs.bk
+
+# macOS
+.DS_Store
+
+# Editor / IDE
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Superpowers scratch (specs/plans/notes)
+docs/superpowers/
