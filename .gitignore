@@ -20,5 +20,3 @@
 .env.*.local
 !.env.example
 
-# Superpowers scratch (specs/plans/notes)
-docs/superpowers/
