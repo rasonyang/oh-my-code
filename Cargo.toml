@@ -26,6 +26,7 @@ pin-project-lite = "0.2"
 glob = "0.3"
 urlencoding = "2"
 dotenvy = "0.15"
+url = "2"
 
 [dev-dependencies]
 tempfile = "3"
