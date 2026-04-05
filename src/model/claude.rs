@@ -525,9 +525,14 @@ mod tests {
 
         let messages = vec![Message::user("Reply with exactly the word: pong")];
         let tools: Vec<ToolDef> = vec![];
+        // Generous budget so reasoning models (e.g. MiniMax M2.7) have room
+        // for their thinking phase plus a final text block. The Claude adapter
+        // currently drops `thinking_delta` events, so only the final text
+        // block contributes to `accumulated`; an undersized budget makes the
+        // model stop mid-reasoning with no text_delta ever emitted.
         let config = ModelConfig {
             model_id: model,
-            max_tokens: 64,
+            max_tokens: 1024,
             temperature: 0.0,
         };
 
