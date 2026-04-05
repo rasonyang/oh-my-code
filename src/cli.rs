@@ -22,7 +22,14 @@ impl Repl {
     pub fn new(config: AppConfig) -> Result<Self> {
         let api_key = config.resolve_api_key()?;
         let provider_config = config.active_provider_config()?;
-        let provider_name = config.default.provider.clone();
+        // When the synthetic "env" provider is active, routing_name carries the
+        // real wire-format name ("claude" / "minimax-anthropic" / "openai"). For
+        // TOML-loaded providers routing_name is None and the config-map key IS the
+        // routing name.
+        let provider_name = provider_config
+            .routing_name
+            .clone()
+            .unwrap_or_else(|| config.default.provider.clone());
         let base_url = provider_config.base_url.clone();
 
         let auth_style = provider_config.auth_style;
