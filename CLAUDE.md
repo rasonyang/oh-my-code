@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 cargo build                         # debug build
 cargo build --release               # release binary at target/release/oh-my-code
-cargo test                          # run full test suite (expect ~97 tests)
+cargo test                          # run full test suite (expect ~112 tests)
 cargo test <module::path>           # run a subset, e.g. cargo test model::types
 cargo test <name> -- --nocapture    # show println! output from a single test
 cargo check                         # fast type-check without codegen
@@ -21,10 +21,19 @@ cargo fmt                           # format
 
 Note: this crate is a binary-only crate (no `lib` target). `cargo test --lib ...` will fail — use `cargo test <path>` instead.
 
-Running the REPL requires an API key in the env var the chosen provider expects (see `src/config.rs::default_config` for the mapping, e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ZHIPU_API_KEY`, `MINIMAX_API_KEY`):
+Running the REPL has two configuration paths, which coexist:
+
+**Quick start (three vars, recommended for single-provider use):** copy `.env.example` to `.env`, fill in `API_KEY`, `BASE_URL`, and `MODEL`. `dotenvy::dotenv()` at the top of `main.rs` loads `.env` into the process environment, and `apply_env_quick_start` in `src/config.rs` synthesizes an in-memory provider entry named `"env"`. Wire format (Anthropic vs OpenAI) and auth style (`x-api-key` vs `Bearer`) are auto-detected from `BASE_URL` via `detect_backend` — hostname `api.anthropic.com` → Anthropic + `XApiKey`; path containing `/anthropic` → Anthropic + `Bearer`; otherwise → OpenAI + `Bearer`.
+
+**Multi-provider (`config.toml`):** leave the three quick-start vars unset. `AppConfig::load` then uses the five providers defined in `~/.config/oh-my-code/config.toml` (`claude`, `openai`, `zhipu`, `minimax`, `minimax-anthropic`) and reads the per-vendor key from the env var named in each provider's `api_key_env` field (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ZHIPU_API_KEY`, `MINIMAX_API_KEY`, `ANTHROPIC_AUTH_TOKEN` respectively).
 
 ```bash
-MINIMAX_API_KEY=<key> ./target/release/oh-my-code
+# quick start
+cp .env.example .env   # then edit .env
+./target/release/oh-my-code
+
+# multi-provider (config.toml selects active provider)
+ANTHROPIC_API_KEY=<key> ./target/release/oh-my-code
 ```
 
 On first run, a default config is written to `~/.config/oh-my-code/config.toml`. Sessions are persisted as JSON under `~/.config/oh-my-code/sessions/`.
@@ -47,7 +56,7 @@ The system is an async (tokio) agent loop that streams responses from a pluggabl
 
 **Native search (`src/search/`):** Instead of spawning `rg`/`fd`, search uses `grep-searcher` + `grep-regex` (`ripgrep.rs`), the `ignore` walker with `glob` patterns (`finder.rs`), and `syntect` for ANSI-highlighted output (`highlight.rs`). The `grep` and `glob` tools delegate here. Ignore patterns come from `AppConfig.search.ignore_patterns`.
 
-**Config (`src/config.rs`):** TOML-based `AppConfig` with `[default]`, `[providers.*]`, `[search]`, `[session]` sections. `resolve_api_key()` reads the env var named in the active provider's `api_key_env`. `resolved_session_dir()` expands a leading `~/`. `config/default.toml` in the repo is the template baked into tests via `include_str!`.
+**Config (`src/config.rs`):** TOML-based `AppConfig` with `[default]`, `[providers.*]`, `[search]`, `[session]` sections. `AppConfig::load` order is: (1) read `~/.config/oh-my-code/config.toml` (or write defaults if missing), (2) call `apply_env_quick_start` which inserts an in-memory `"env"` provider when `API_KEY`/`BASE_URL`/`MODEL` are all set and non-empty, and warns on stderr when only some are set (likely user mistake). `detect_backend(base_url)` is a pure, URL-only classifier (see routing rules above) that drives `auth_style` and `routing_name` on the synthesized `ProviderConfig`. The `#[serde(skip)] routing_name: Option<String>` field is `None` for every TOML-loaded provider and `Some("claude" | "minimax-anthropic" | "openai")` for the synthesized `"env"` entry; `cli.rs` reads it to pass the real wire-format name to `create_provider`, which would otherwise see the meaningless map key `"env"`. `resolve_api_key()` reads the env var named in the active provider's `api_key_env` (for the synthesized env provider, that's literally `"API_KEY"`). `resolved_session_dir()` expands a leading `~/`. `config/default.toml` in the repo is the template baked into tests via `include_str!`. `dotenvy::dotenv()` is called once at the top of `main.rs` to load `.env` from the current working directory before `AppConfig::load` runs.
 
 **Sessions (`src/session/`):** `SessionData` is a JSON-serializable snapshot keyed by UUID. `storage.rs` handles load/save under the resolved session directory. The REPL exposes this via `/session` subcommands.
 
