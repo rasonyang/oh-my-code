@@ -75,6 +75,13 @@ pub struct ProviderConfig {
     pub base_url: String,
     #[serde(default)]
     pub auth_style: AuthStyle,
+    /// Routing name passed to `create_provider` when this entry is active.
+    /// `None` for normal TOML-loaded providers — in that case the config-map
+    /// key IS the routing name. `Some(...)` only for the synthetic "env"
+    /// provider built from API_KEY/BASE_URL/MODEL env vars. Never serialized
+    /// to TOML.
+    #[serde(skip)]
+    pub routing_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,6 +136,7 @@ impl AppConfig {
                 api_key_env: "ANTHROPIC_API_KEY".to_string(),
                 base_url: "https://api.anthropic.com".to_string(),
                 auth_style: AuthStyle::XApiKey,
+                routing_name: None,
             },
         );
         providers.insert(
@@ -137,6 +145,7 @@ impl AppConfig {
                 api_key_env: "OPENAI_API_KEY".to_string(),
                 base_url: "https://api.openai.com".to_string(),
                 auth_style: AuthStyle::XApiKey,
+                routing_name: None,
             },
         );
         providers.insert(
@@ -145,6 +154,7 @@ impl AppConfig {
                 api_key_env: "ZHIPU_API_KEY".to_string(),
                 base_url: "https://open.bigmodel.cn/api/paas/v4".to_string(),
                 auth_style: AuthStyle::XApiKey,
+                routing_name: None,
             },
         );
         providers.insert(
@@ -153,6 +163,7 @@ impl AppConfig {
                 api_key_env: "MINIMAX_API_KEY".to_string(),
                 base_url: "https://api.minimax.chat/v1".to_string(),
                 auth_style: AuthStyle::XApiKey,
+                routing_name: None,
             },
         );
         providers.insert(
@@ -161,6 +172,7 @@ impl AppConfig {
                 api_key_env: "ANTHROPIC_AUTH_TOKEN".to_string(),
                 base_url: "https://api.minimaxi.com/anthropic".to_string(),
                 auth_style: AuthStyle::Bearer,
+                routing_name: None,
             },
         );
 
@@ -376,5 +388,17 @@ storage_dir = "/tmp"
         let config = AppConfig::load_from_str(content).expect("Should parse");
         let p = config.providers.get("x").expect("x provider");
         assert_eq!(p.auth_style, AuthStyle::Bearer);
+    }
+
+    #[test]
+    fn toml_loaded_providers_have_no_routing_name() {
+        let config = AppConfig::default_config();
+        for (name, provider) in &config.providers {
+            assert!(
+                provider.routing_name.is_none(),
+                "provider '{}' should have routing_name = None by default (it's only set by env synthesis)",
+                name
+            );
+        }
     }
 }
