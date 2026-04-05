@@ -13,5 +13,12 @@
 .idea/
 .vscode/
 
+# Secrets — local environment files. Never commit these.
+# .env.example IS tracked (it's the documented template, no real secrets).
+.env
+.env.local
+.env.*.local
+!.env.example
+
 # Superpowers scratch (specs/plans/notes)
 docs/superpowers/
