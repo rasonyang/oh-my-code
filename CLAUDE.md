@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 cargo build                         # debug build
 cargo build --release               # release binary at target/release/oh-my-code
-cargo test                          # run full test suite (expect ~92 tests)
+cargo test                          # run full test suite (expect ~97 tests)
 cargo test <module::path>           # run a subset, e.g. cargo test model::types
 cargo test <name> -- --nocapture    # show println! output from a single test
 cargo check                         # fast type-check without codegen
@@ -35,7 +35,7 @@ The system is an async (tokio) agent loop that streams responses from a pluggabl
 
 **Entry flow:** `main.rs` → loads `AppConfig` → constructs `cli::Repl` → rustyline loop reads input → `Agent::run_turn` is called per user message. Slash commands (`/quit`, `/clear`, `/model`, `/session`, `/help`) are handled directly in `cli.rs` before falling through to the agent.
 
-**Provider abstraction (`src/model/`):** The `Provider` trait returns a `BoxStream<'static, StreamEvent>` so every backend can produce a uniform stream of `Delta`, `ToolUseStart`, `ToolUseDelta`, `InputJsonComplete`, `MessageEnd` events. `create_provider` dispatches by name: `"claude"` → `claude.rs` (Anthropic Messages API SSE), and `"openai" | "zhipu" | "minimax"` → `openai.rs` (OpenAI-compatible Chat Completions SSE). Internal `Message` / `ContentBlock` types in `model/types.rs` are the canonical format; each adapter translates to/from its wire format.
+**Provider abstraction (`src/model/`):** The `Provider` trait returns a `BoxStream<'static, StreamEvent>` so every backend can produce a uniform stream of `Delta`, `ToolUseStart`, `ToolUseDelta`, `InputJsonComplete`, `MessageEnd` events. `create_provider` dispatches by name: `"claude"` and `"minimax-anthropic"` → `claude.rs` (Anthropic Messages API SSE; `minimax-anthropic` targets MiniMax's Anthropic-compatible endpoint with `AuthStyle::Bearer` instead of `x-api-key`), and `"openai" | "zhipu" | "minimax"` → `openai.rs` (OpenAI-compatible Chat Completions SSE). Auth header selection is driven by `ProviderConfig.auth_style` (`AuthStyle::XApiKey` default, `AuthStyle::Bearer` for Anthropic-compatible third parties). Internal `Message` / `ContentBlock` types in `model/types.rs` are the canonical format; each adapter translates to/from its wire format.
 
 **Agent loop (`src/agent/mod.rs`):** `Agent::run_turn` pushes the user message, then loops up to `max_turns` times: build system prompt → send history + tools to provider → consume the stream, accumulating text and tool_use blocks → append assistant message → if no tool calls, return; otherwise execute tools via `ToolExecutor` and append a `tool_results` message before looping. The system prompt is rebuilt each iteration so the current Plan/Act mode label is fresh.
 
