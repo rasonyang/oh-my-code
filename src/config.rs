@@ -119,6 +119,7 @@ pub(crate) fn apply_env_quick_start(cfg: &mut AppConfig) {
         ProviderConfig {
             api_key_env: "API_KEY".to_string(),
             base_url,
+            api_key: None,
             auth_style: backend.auth_style,
             routing_name: Some(backend.routing_name.to_string()),
         },
@@ -129,8 +130,12 @@ pub(crate) fn apply_env_quick_start(cfg: &mut AppConfig) {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderConfig {
+    #[serde(default)]
     pub api_key_env: String,
     pub base_url: String,
+    /// API key value set directly in config. Takes priority over `api_key_env`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
     #[serde(default)]
     pub auth_style: AuthStyle,
     /// Routing name passed to `create_provider` when this entry is active.
@@ -155,8 +160,8 @@ pub struct SessionConfig {
 
 impl AppConfig {
     pub fn config_dir() -> Result<PathBuf> {
-        let base = dirs::config_dir().ok_or_else(|| anyhow!("Could not determine config directory"))?;
-        Ok(base.join("oh-my-code"))
+        let home = dirs::home_dir().ok_or_else(|| anyhow!("Could not determine home directory"))?;
+        Ok(home.join(".config").join("oh-my-code"))
     }
 
     pub fn config_path() -> Result<PathBuf> {
@@ -198,6 +203,7 @@ impl AppConfig {
                 api_key_env: "ANTHROPIC_API_KEY".to_string(),
                 base_url: "https://api.anthropic.com".to_string(),
                 auth_style: AuthStyle::XApiKey,
+                api_key: None,
                 routing_name: None,
             },
         );
@@ -207,6 +213,7 @@ impl AppConfig {
                 api_key_env: "OPENAI_API_KEY".to_string(),
                 base_url: "https://api.openai.com".to_string(),
                 auth_style: AuthStyle::XApiKey,
+                api_key: None,
                 routing_name: None,
             },
         );
@@ -216,6 +223,7 @@ impl AppConfig {
                 api_key_env: "ZHIPU_API_KEY".to_string(),
                 base_url: "https://open.bigmodel.cn/api/paas/v4".to_string(),
                 auth_style: AuthStyle::XApiKey,
+                api_key: None,
                 routing_name: None,
             },
         );
@@ -225,6 +233,7 @@ impl AppConfig {
                 api_key_env: "MINIMAX_API_KEY".to_string(),
                 base_url: "https://api.minimax.chat/v1".to_string(),
                 auth_style: AuthStyle::XApiKey,
+                api_key: None,
                 routing_name: None,
             },
         );
@@ -234,6 +243,7 @@ impl AppConfig {
                 api_key_env: "ANTHROPIC_AUTH_TOKEN".to_string(),
                 base_url: "https://api.minimaxi.com/anthropic".to_string(),
                 auth_style: AuthStyle::Bearer,
+                api_key: None,
                 routing_name: None,
             },
         );
@@ -269,6 +279,18 @@ impl AppConfig {
 
     pub fn resolve_api_key(&self) -> Result<String> {
         let provider = self.active_provider_config()?;
+        // Prefer api_key from config file; fall back to env var lookup.
+        if let Some(key) = &provider.api_key {
+            if !key.is_empty() {
+                return Ok(key.clone());
+            }
+        }
+        if provider.api_key_env.is_empty() {
+            anyhow::bail!(
+                "Provider '{}' has neither 'api_key' nor 'api_key_env' configured",
+                self.default.provider
+            );
+        }
         std::env::var(&provider.api_key_env).with_context(|| {
             format!(
                 "Environment variable '{}' not set for provider '{}'",
